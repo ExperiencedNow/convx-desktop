@@ -10,13 +10,17 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import com.convx.desktop.audio.DesktopAudioPlayer
+import com.convx.desktop.db.ConvxDatabase
+import com.convx.desktop.db.SettingsManager
 import com.convx.desktop.ui.shell.DesktopShell
 import com.convx.desktop.ui.theme.AppleTokens
 import com.convx.desktop.ui.theme.AppShapes
 
 fun main() = application {
     val windowState = WindowState(size = DpSize(1280.dp, 840.dp))
-    val player = remember { DesktopAudioPlayer() }
+    val player = DesktopAudioPlayer()
+    val database = ConvxDatabase.getInstance()
+    val settingsManager = SettingsManager.getInstance()
 
     val handleClose = {
         try {
@@ -44,7 +48,9 @@ fun main() = application {
             DesktopShell(
                 windowState = windowState,
                 onClose = handleClose,
-                player = player
+                player = player,
+                database = database,
+                settingsManager = settingsManager
             )
         }
     }

@@ -19,6 +19,15 @@ class SettingsManager(
     )
 ) {
     companion object {
+        @Volatile
+        private var instance: SettingsManager? = null
+
+        fun getInstance(): SettingsManager {
+            return instance ?: synchronized(this) {
+                instance ?: SettingsManager().also { instance = it }
+            }
+        }
+
         private val KEY_VOLUME = floatPreferencesKey("volume")
         private val KEY_IS_MUTED = booleanPreferencesKey("is_muted")
         private val KEY_REPEAT_MODE = stringPreferencesKey("repeat_mode")

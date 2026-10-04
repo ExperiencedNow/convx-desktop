@@ -52,11 +52,19 @@ import com.convx.desktop.audio.DesktopAudioPlayer
 import com.convx.desktop.audio.MediaTrack
 import com.convx.desktop.audio.PlaybackStatus
 import com.convx.desktop.audio.RepeatMode
+import com.convx.desktop.db.ConvxDatabase
+import com.convx.desktop.db.SettingsManager
+import com.convx.desktop.ui.component.AsyncArtwork
 import com.convx.desktop.ui.component.GlassEffectConfig
 import com.convx.desktop.ui.component.LocalGlassEffectConfig
 import com.convx.desktop.ui.component.icons.ConvxIcons
 import com.convx.desktop.ui.component.liquidGlass
 import com.convx.desktop.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.desktop.ui.screens.HomeScreen
+import com.convx.desktop.ui.screens.LibraryScreen
+import com.convx.desktop.ui.screens.SearchScreen
+import com.convx.desktop.ui.screens.SettingsScreen
+import com.convx.desktop.ui.screens.SongsScreen
 import com.convx.desktop.ui.theme.AppleTokens
 
 data class NavItem(
@@ -78,9 +86,21 @@ fun WindowScope.DesktopShell(
     windowState: WindowState,
     onClose: () -> Unit,
     player: DesktopAudioPlayer? = null,
+    database: ConvxDatabase = ConvxDatabase.getInstance(),
+    settingsManager: SettingsManager = SettingsManager.getInstance(),
     modifier: Modifier = Modifier
 ) {
-    val glassConfig = remember { GlassEffectConfig() }
+    val glassStyle by settingsManager.glassStyle.collectAsState(initial = com.convx.desktop.ui.component.GlassStyle.LIQUID)
+    val glassBlurRadius by settingsManager.glassBlurRadius.collectAsState(initial = 2f)
+    val glassVibrancy by settingsManager.glassVibrancy.collectAsState(initial = 1.2f)
+
+    val glassConfig = remember(glassStyle, glassBlurRadius, glassVibrancy) {
+        GlassEffectConfig(
+            style = glassStyle,
+            blurRadius = glassBlurRadius,
+            vibrancy = glassVibrancy
+        )
+    }
     var selectedRoute by remember { mutableStateOf("home") }
 
     // Reactive Player State
@@ -157,10 +177,10 @@ fun WindowScope.DesktopShell(
                         // Main Content View
                         DesktopContentView(
                             selectedRoute = selectedRoute,
-                            featuredTracks = demoTracks,
-                            onPlayTrack = { track ->
-                                player?.playTrack(track)
-                            },
+                            player = player,
+                            database = database,
+                            settingsManager = settingsManager,
+                            glassConfig = glassConfig,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                     }
@@ -174,6 +194,7 @@ fun WindowScope.DesktopShell(
                         DesktopMiniPlayerDock(
                             trackTitle = currentTrack?.title ?: "Convx Music",
                             trackArtist = currentTrack?.artists ?: "Select a track to play",
+                            thumbnailUrl = currentTrack?.thumbnailUrl,
                             isPlaying = isPlaying,
                             isBuffering = status == PlaybackStatus.BUFFERING,
                             onTogglePlay = {
@@ -412,148 +433,47 @@ fun DesktopSidebar(
 @Composable
 fun DesktopContentView(
     selectedRoute: String,
-    featuredTracks: List<MediaTrack>,
-    onPlayTrack: (MediaTrack) -> Unit,
+    player: DesktopAudioPlayer?,
+    database: ConvxDatabase,
+    settingsManager: SettingsManager,
+    glassConfig: GlassEffectConfig,
     modifier: Modifier = Modifier
 ) {
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = AppleTokens.Gutter, vertical = AppleTokens.Gutter)
-    ) {
-        // Section Screen Title
-        Text(
-            text = when (selectedRoute) {
-                "home" -> "Listen Now"
-                "songs" -> "Songs"
-                "search" -> "Search"
-                "library" -> "Your Library"
-                "settings" -> "Settings"
-                else -> "Listen Now"
-            },
-            fontSize = AppleTokens.TitleLarge,
-            lineHeight = AppleTokens.TitleLargeLineHeight,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
+    when (selectedRoute) {
+        "home" -> HomeScreen(
+            player = player,
+            database = database,
+            modifier = modifier
         )
-
-        Spacer(modifier = Modifier.height(AppleTokens.SectionGap))
-
-        // Hero Card with squircle shape and liquid glass
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .clip(ContinuousRoundedRectangle(AppleTokens.CardCornerLarge))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF2A0845),
-                            Color(0xFF6441A5),
-                            Color(0xFFFA2D48)
-                        )
-                    )
-                )
-                .clickable {
-                    if (featuredTracks.isNotEmpty()) onPlayTrack(featuredTracks.first())
-                }
-                .padding(24.dp)
-        ) {
-            Column(modifier = Modifier.align(Alignment.BottomStart)) {
-                Text(
-                    text = "FEATURED ALBUM · THE WEEKND",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.7f)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Starboy (Deluxe Edition)",
-                    fontSize = AppleTokens.SectionHeader,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Click to play in high-fidelity Opus via LibVLC audio engine.",
-                    fontSize = AppleTokens.ItemSubtitle,
-                    color = Color.White.copy(alpha = 0.85f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(AppleTokens.SectionGap))
-
-        // Section: Recently Played Grid
-        Text(
-            text = "Recently Played",
-            fontSize = AppleTokens.SectionHeader,
-            lineHeight = AppleTokens.SectionHeaderLineHeight,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
+        "songs" -> SongsScreen(
+            player = player,
+            database = database,
+            glassConfig = glassConfig,
+            modifier = modifier
         )
-
-        Spacer(modifier = Modifier.height(AppleTokens.ItemGap))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppleTokens.ItemGap)
-        ) {
-            featuredTracks.forEachIndexed { index, track ->
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(ContinuousRoundedRectangle(AppleTokens.Artwork))
-                        .clickable { onPlayTrack(track) }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp)
-                            .clip(ContinuousRoundedRectangle(AppleTokens.Artwork))
-                            .background(
-                                when (index % 4) {
-                                    0 -> Color(0xFF3A1C71)
-                                    1 -> Color(0xFFD76D77)
-                                    2 -> Color(0xFF200122)
-                                    else -> Color(0xFF0F2027)
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = ConvxIcons.Play,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = track.title,
-                        fontSize = AppleTokens.ItemTitle,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White,
-                        maxLines = 1
-                    )
-
-                    Text(
-                        text = track.artists,
-                        fontSize = AppleTokens.ItemSubtitle,
-                        color = AppleTokens.Metadata,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        // Leave buffer space for the floating bottom mini player
-        Spacer(modifier = Modifier.height(120.dp))
+        "search" -> SearchScreen(
+            player = player,
+            database = database,
+            glassConfig = glassConfig,
+            modifier = modifier
+        )
+        "library" -> LibraryScreen(
+            player = player,
+            database = database,
+            glassConfig = glassConfig,
+            modifier = modifier
+        )
+        "settings" -> SettingsScreen(
+            player = player,
+            settingsManager = settingsManager,
+            glassConfig = glassConfig,
+            modifier = modifier
+        )
+        else -> HomeScreen(
+            player = player,
+            database = database,
+            modifier = modifier
+        )
     }
 }
 
@@ -561,6 +481,7 @@ fun DesktopContentView(
 fun DesktopMiniPlayerDock(
     trackTitle: String,
     trackArtist: String,
+    thumbnailUrl: String? = null,
     isPlaying: Boolean,
     isBuffering: Boolean,
     onTogglePlay: () -> Unit,
@@ -597,24 +518,11 @@ fun DesktopMiniPlayerDock(
             modifier = Modifier.width(260.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(ContinuousRoundedRectangle(AppleTokens.Artwork))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Color(0xFFE52D27), Color(0xFFB31217))
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) ConvxIcons.Pause else ConvxIcons.Play,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            AsyncArtwork(
+                url = thumbnailUrl,
+                modifier = Modifier.size(48.dp),
+                shape = ContinuousRoundedRectangle(AppleTokens.Artwork)
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 

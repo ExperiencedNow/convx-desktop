@@ -170,6 +170,8 @@ class DesktopAudioPlayer(
         loadAndPlay(tracks[_queueIndex.value])
     }
 
+    fun setQueue(tracks: List<MediaTrack>, startIndex: Int = 0) = playQueue(tracks, startIndex)
+
     private fun loadAndPlay(track: MediaTrack) {
         _currentTrack.value = track
         _status.value = PlaybackStatus.BUFFERING
@@ -202,8 +204,8 @@ class DesktopAudioPlayer(
         val streamingData = response.streamingData ?: return null
 
         val format = streamingData.adaptiveFormats
-            ?.filter { it.isAudio }
-            ?.maxByOrNull { it.bitrate ?: 0 }
+            .filter { it.isAudio }
+            .maxByOrNull { it.bitrate }
             ?: streamingData.formats?.firstOrNull()
 
         return format?.url

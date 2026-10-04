@@ -53,6 +53,12 @@ interface SongDao {
     @Query("UPDATE songs SET playCount = playCount + 1, lastPlayedTime = :time WHERE id = :id")
     suspend fun recordPlay(id: String, time: Long = System.currentTimeMillis())
 
+    @Query("SELECT * FROM songs ORDER BY title ASC")
+    fun getAllSongs(): Flow<List<SongRecord>>
+
+    @Query("DELETE FROM songs WHERE id = :id")
+    suspend fun deleteSong(id: String)
+
     @Query("SELECT COUNT(*) FROM songs")
     suspend fun count(): Int
 }
@@ -65,6 +71,9 @@ interface SearchHistoryDao {
     @Query("SELECT query FROM search_history ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentQueries(limit: Int = 10): Flow<List<String>>
 
+    @Query("DELETE FROM search_history WHERE query = :query")
+    suspend fun deleteQuery(query: String)
+
     @Query("DELETE FROM search_history")
     suspend fun clearHistory()
 }
@@ -75,6 +84,9 @@ abstract class ConvxDatabase : RoomDatabase() {
     abstract fun searchHistoryDao(): SearchHistoryDao
 
     companion object {
+        @Volatile
+        private var instance: ConvxDatabase? = null
+
         fun create(dbFile: File): ConvxDatabase {
             dbFile.parentFile?.mkdirs()
             return Room.databaseBuilder<ConvxDatabase>(
@@ -83,6 +95,12 @@ abstract class ConvxDatabase : RoomDatabase() {
             .setDriver(BundledSQLiteDriver())
             .fallbackToDestructiveMigration(true)
             .build()
+        }
+
+        fun getInstance(): ConvxDatabase {
+            return instance ?: synchronized(this) {
+                instance ?: create(StoragePaths.databaseFile).also { instance = it }
+            }
         }
     }
 }
