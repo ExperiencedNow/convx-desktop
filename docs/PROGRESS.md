@@ -1,24 +1,38 @@
 # Progress
 
-## Status (updated 2026-10-04)
-Phase: 3 COMPLETE -> Entering Phase 4 (Services & Domain / Player Engine Integration)
-Last commit: 85ce245 · Branch: desktop/main
-Last full test run: S1 (Pass), S2 (100% Pass), S3 (Pass), S4 (Pass), S6 (Pass), Phase3FoundationTest (Pass - 4/4)
+## Status (updated 2026-10-05)
+Phase: 6 COMPLETE -> Phase 7 Preview Gate READY for User Evaluation
+Last commit: `137e073` · Branch: `desktop/main`
+Last full test run: Spikes S1-S7 (100% Pass), Phase 3 (Pass), Phase 5 (Pass), Phase 6 (Pass), Android Oracle (100% Pass)
 
-## Done since last handoff
-- **Phase 3 Foundation (Design System & Tokens)**:
-  - Ported `AppleTokens.kt` to `desktopApp/src/main/kotlin/com/convx/desktop/ui/theme/AppleTokens.kt` preserving exact r52 colors, spacing, typography, motion curves (`AppleTokens.Motion`), and adaptive contrast helpers (`onColor`, `onColorSecondary`, `onColorHeading`) with pure Kotlin HSL conversion math (replacing Android `ColorUtils`).
-  - Ported continuous squircle shape system (`ContinuousRoundedRectangle`, `Continuity`, `AdvancedContinuity`, `G0Continuity`, `G1Continuity`, `G2Continuity`, `G2ContinuityProfile`, `Point`, `CubicBezier`, `PathSegment`, `PathSegments`, `PathSegmentsBuilder`, `LerpContinuousRoundedRectangle`) using pure Compose UI `Path`.
-  - Ported `GlassEffect.kt` preserving exact r52 public signatures (`Modifier.liquidGlass(...)`, `GlassEffectConfig`, `GlassStyle`, `glassResolutionScale`, `LocalGlassEffectConfig`, and Skia `RuntimeEffect` integration).
-  - Implemented 18 vector icons (`ConvxIcons.kt`) covering navigation, media playback, volume, favorites, and custom Windows title bar controls.
-  - Implemented `DesktopShell.kt` featuring custom draggable Windows title bar, collapsible tablet/desktop sidebar with animated selection puck, rich gradient backdrop content view, and floating liquid glass bottom mini player dock.
-  - Verified Phase 3 Foundation Gate via `Phase3FoundationTest` (100% pass) and full test suite regression pass.
-  - Verified Android Oracle (`:app:compileUniversalFossDebugKotlin`) compiles cleanly (1s, 0 errors).
+## Accomplished
+- **Phase 0 & 1 (Scaffolding & Toolchains)**: JDK 21, LibVLC 3.0.23, Gradle 9.4.1, multi-project scaffolding.
+- **Phase 2 (Technical Spikes)**: S1–S7 all PASSED (SkSL Shader, InnerTube 20/20 streams, LibVLC dual playback, Room KMP + DataStore, QuickJS runtime).
+- **Phase 3 (Foundation & Apple Tokens)**: `AppleTokens.kt`, squircle shape system (G0/G1/G2), `GlassEffect.kt` SkSL compilation, `ConvxIcons.kt` (18 icons), `DesktopShell.kt` with custom title bar and floating liquid glass mini-player dock.
+- **Phase 4 (Audio Engine & Persistence)**: `DesktopAudioPlayer.kt` (vlcj LibVLC engine with reactive StateFlows), `ConvxDatabase.kt` (Room KMP 2.8.4 on JVM with Bundled SQLite), `SettingsManager.kt` (DataStore Preferences 1.2.0 on JVM), `StoragePaths.kt` (`%LOCALAPPDATA%\Convx`).
+- **Phase 5 (Screens & Features)**:
+  - `HomeScreen`: Featured Hero card, Quick Picks row, Recently Played row synced to Room DB.
+  - `SearchScreen`: Liquid glass search bar, InnerTube live song search, search history chips from `SearchHistoryDao`, track rows with like toggle.
+  - `LibraryScreen`: Liked Songs and Recently Played tabs, "Play All", "Shuffle All", track list synced to `SongDao`.
+  - `SongsScreen`: Table view of all tracks, instant keyword filtering, play count and duration display.
+  - `SettingsScreen`: Reactive liquid glass tuning (style, blur, vibrancy), master volume slider, mute switch, storage paths display, about section.
+  - `AsyncArtwork.kt`: In-memory cached async image loader using Skia `Image.makeFromEncoded`.
+- **Phase 6 (Subsystems - Lyrics, Canvas & Integrations)**:
+  - Converted pure Kotlin submodules (`lrclib`, `betterlyrics`, `kugou`, `simpmusic`, `youlyplus`, `lastfm`, `kizzy`) to pure Kotlin JVM modules shared across desktop and Android.
+  - `DesktopLyricsManager`: Waterfall lyrics engine coordinating SimpMusic (by videoId), LrcLib, YouLyPlus, BetterLyrics, and KuGou with LRU caching, regex time parser, and active line tracking.
+  - `LyricsView.kt`: Apple-style full-screen liquid glass lyrics panel with smooth spring active-line auto-scrolling, bold white glow highlight, and click-to-seek audio navigation.
+  - `DesktopDiscordRpc`: Rich presence broadcasting "Listening to {Title} by {Artist}" via Kizzy RPC WebSocket.
+  - `DesktopLastFm`: Last.fm scrobbler integration.
+- **Phase 7 (Packaging & Preview Gate)**:
+  - Built unpacked native portable desktop app via `createDistributable`:
+    `desktopApp\build\compose\binaries\main\app\Convx\Convx.exe` (148.4 MB total self-contained bundle).
+  - Authored comprehensive Preview Gate Report: [`docs/evidence/preview/PREVIEW_REPORT.md`](file:///c:/Users/Michael%20Sandi/YouTube%20Music%20Desktop/convx-desktop/docs/evidence/preview/PREVIEW_REPORT.md).
+  - Verified Android Oracle `:app:compileUniversalFossDebugKotlin` is 100% GREEN (125/125 tasks up to date).
 
 ## Next 3 actions
-1. Phase 4: Build audio service layer in `desktopApp` connecting `LocalStreamProxy` and `vlcj` LibVLC engine to a desktop `PlayerService` and state manager.
-2. Phase 4: Integrate YouTube Music playback flow (`InnerTube.search` -> `player` stream resolution -> `LocalStreamProxy` -> `vlcj` playback) driven by UI controls.
-3. Phase 4: Wire Room Database + DataStore settings into desktop state models for playback history, favorites, and volume persistence.
+1. User tests and verifies Preview B portable folder using the 10-minute guided tour.
+2. User provides approval by creating `APPROVED.txt` with `APPROVED FOR EXE`.
+3. Agent executes final installer packaging via `scripts\package-exe.ps1` to produce the installer `.exe`.
 
 ## Blockers / waiting on user
-- None. Proceeding directly to Phase 4 (Services & Domain / Player Integration).
+- Waiting for user evaluation of the Preview Gate (Phase 7). Final `.exe` packaging is blocked until user approves per Rule F7.
