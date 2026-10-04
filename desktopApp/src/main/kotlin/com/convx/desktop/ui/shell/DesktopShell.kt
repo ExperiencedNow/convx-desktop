@@ -1,13 +1,10 @@
 package com.convx.desktop.ui.shell
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material3.Icon
@@ -32,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +48,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
+import com.convx.desktop.audio.DesktopAudioPlayer
+import com.convx.desktop.audio.MediaTrack
+import com.convx.desktop.audio.PlaybackStatus
+import com.convx.desktop.audio.RepeatMode
 import com.convx.desktop.ui.component.GlassEffectConfig
 import com.convx.desktop.ui.component.LocalGlassEffectConfig
 import com.convx.desktop.ui.component.icons.ConvxIcons
@@ -64,19 +65,36 @@ data class NavItem(
     val icon: ImageVector
 )
 
+fun formatTime(ms: Long): String {
+    val totalSeconds = (ms / 1000).coerceAtLeast(0)
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WindowScope.DesktopShell(
     windowState: WindowState,
     onClose: () -> Unit,
+    player: DesktopAudioPlayer? = null,
     modifier: Modifier = Modifier
 ) {
     val glassConfig = remember { GlassEffectConfig() }
     var selectedRoute by remember { mutableStateOf("home") }
-    var isPlaying by remember { mutableStateOf(false) }
-    var isMuted by remember { mutableStateOf(false) }
-    var volume by remember { mutableFloatStateOf(0.75f) }
-    var progress by remember { mutableFloatStateOf(0.35f) }
+
+    // Reactive Player State
+    val status = player?.status?.collectAsState()?.value ?: PlaybackStatus.IDLE
+    val currentTrack = player?.currentTrack?.collectAsState()?.value
+    val positionMs = player?.positionMs?.collectAsState()?.value ?: 0L
+    val durationMs = player?.durationMs?.collectAsState()?.value ?: 0L
+    val volume = player?.volume?.collectAsState()?.value ?: 0.75f
+    val isMuted = player?.isMuted?.collectAsState()?.value ?: false
+    val isShuffle = player?.isShuffle?.collectAsState()?.value ?: false
+    val repeatMode = player?.repeatMode?.collectAsState()?.value ?: RepeatMode.OFF
+
+    val isPlaying = status == PlaybackStatus.PLAYING
+    val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 
     val navItems = remember {
         listOf(
@@ -85,6 +103,15 @@ fun WindowScope.DesktopShell(
             NavItem("search", "Search", ConvxIcons.Search),
             NavItem("library", "Library", ConvxIcons.Library),
             NavItem("settings", "Settings", ConvxIcons.Settings)
+        )
+    }
+
+    val demoTracks = remember {
+        listOf(
+            MediaTrack("3_g2un5M350", "Starboy", "The Weeknd ft. Daft Punk", "3:50", 230),
+            MediaTrack("4NRXx6U8ABQ", "Blinding Lights", "The Weeknd", "3:20", 200),
+            MediaTrack("ygTZZpVHNmA", "After Hours", "The Weeknd", "6:01", 361),
+            MediaTrack("4D7u5KF7SP8", "Get Lucky", "Daft Punk ft. Pharrell Williams", "4:08", 248)
         )
     }
 
@@ -130,6 +157,10 @@ fun WindowScope.DesktopShell(
                         // Main Content View
                         DesktopContentView(
                             selectedRoute = selectedRoute,
+                            featuredTracks = demoTracks,
+                            onPlayTrack = { track ->
+                                player?.playTrack(track)
+                            },
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                     }
@@ -141,18 +172,42 @@ fun WindowScope.DesktopShell(
                             .padding(bottom = AppleTokens.Gutter, start = AppleTokens.Gutter, end = AppleTokens.Gutter)
                     ) {
                         DesktopMiniPlayerDock(
+                            trackTitle = currentTrack?.title ?: "Convx Music",
+                            trackArtist = currentTrack?.artists ?: "Select a track to play",
                             isPlaying = isPlaying,
-                            onTogglePlay = { isPlaying = !isPlaying },
+                            isBuffering = status == PlaybackStatus.BUFFERING,
+                            onTogglePlay = {
+                                if (player != null) {
+                                    player.togglePlayPause()
+                                }
+                            },
                             progress = progress,
-                            onProgressChange = { progress = it },
+                            positionMs = positionMs,
+                            durationMs = durationMs,
+                            onSeek = { fraction ->
+                                player?.seekTo(fraction)
+                            },
                             volume = volume,
-                            onVolumeChange = {
-                                volume = it
-                                isMuted = it == 0f
+                            onVolumeChange = { vol ->
+                                player?.setVolume(vol)
                             },
                             isMuted = isMuted,
                             onToggleMute = {
-                                isMuted = !isMuted
+                                player?.toggleMute()
+                            },
+                            onNext = {
+                                player?.skipNext()
+                            },
+                            onPrevious = {
+                                player?.skipPrevious()
+                            },
+                            isShuffle = isShuffle,
+                            onToggleShuffle = {
+                                player?.toggleShuffle()
+                            },
+                            repeatMode = repeatMode,
+                            onCycleRepeat = {
+                                player?.cycleRepeat()
                             },
                             glassConfig = glassConfig
                         )
@@ -357,6 +412,8 @@ fun DesktopSidebar(
 @Composable
 fun DesktopContentView(
     selectedRoute: String,
+    featuredTracks: List<MediaTrack>,
+    onPlayTrack: (MediaTrack) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -400,25 +457,28 @@ fun DesktopContentView(
                         )
                     )
                 )
+                .clickable {
+                    if (featuredTracks.isNotEmpty()) onPlayTrack(featuredTracks.first())
+                }
                 .padding(24.dp)
         ) {
             Column(modifier = Modifier.align(Alignment.BottomStart)) {
                 Text(
-                    text = "FEATURED PLAYLIST",
+                    text = "FEATURED ALBUM · THE WEEKND",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White.copy(alpha = 0.7f)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Today's Hits & Daily Flow",
+                    text = "Starboy (Deluxe Edition)",
                     fontSize = AppleTokens.SectionHeader,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Top chart tracks curated for your desktop listening session.",
+                    text = "Click to play in high-fidelity Opus via LibVLC audio engine.",
                     fontSize = AppleTokens.ItemSubtitle,
                     color = Color.White.copy(alpha = 0.85f)
                 )
@@ -442,12 +502,12 @@ fun DesktopContentView(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppleTokens.ItemGap)
         ) {
-            repeat(4) { index ->
+            featuredTracks.forEachIndexed { index, track ->
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .clip(ContinuousRoundedRectangle(AppleTokens.Artwork))
-                        .clickable {}
+                        .clickable { onPlayTrack(track) }
                 ) {
                     Box(
                         modifier = Modifier
@@ -475,21 +535,18 @@ fun DesktopContentView(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = when (index) {
-                            0 -> "After Hours"
-                            1 -> "Dawn FM"
-                            2 -> "Blonde"
-                            else -> "Starboy"
-                        },
+                        text = track.title,
                         fontSize = AppleTokens.ItemTitle,
                         fontWeight = FontWeight.Medium,
-                        color = Color.White
+                        color = Color.White,
+                        maxLines = 1
                     )
 
                     Text(
-                        text = "Album · The Weeknd",
+                        text = track.artists,
                         fontSize = AppleTokens.ItemSubtitle,
-                        color = AppleTokens.Metadata
+                        color = AppleTokens.Metadata,
+                        maxLines = 1
                     )
                 }
             }
@@ -502,14 +559,25 @@ fun DesktopContentView(
 
 @Composable
 fun DesktopMiniPlayerDock(
+    trackTitle: String,
+    trackArtist: String,
     isPlaying: Boolean,
+    isBuffering: Boolean,
     onTogglePlay: () -> Unit,
     progress: Float,
-    onProgressChange: (Float) -> Unit,
+    positionMs: Long,
+    durationMs: Long,
+    onSeek: (Float) -> Unit,
     volume: Float,
     onVolumeChange: (Float) -> Unit,
     isMuted: Boolean,
     onToggleMute: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    isShuffle: Boolean,
+    onToggleShuffle: () -> Unit,
+    repeatMode: RepeatMode,
+    onCycleRepeat: () -> Unit,
     glassConfig: GlassEffectConfig,
     modifier: Modifier = Modifier
 ) {
@@ -541,7 +609,7 @@ fun DesktopMiniPlayerDock(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = ConvxIcons.Play,
+                    imageVector = if (isPlaying) ConvxIcons.Pause else ConvxIcons.Play,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
@@ -552,7 +620,7 @@ fun DesktopMiniPlayerDock(
 
             Column {
                 Text(
-                    text = "Starboy",
+                    text = trackTitle,
                     fontSize = AppleTokens.ItemTitle,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White,
@@ -560,9 +628,9 @@ fun DesktopMiniPlayerDock(
                 )
                 Spacer(modifier = Modifier.height(AppleTokens.TextGap))
                 Text(
-                    text = "The Weeknd ft. Daft Punk",
+                    text = if (isBuffering) "Buffering stream..." else trackArtist,
                     fontSize = AppleTokens.ItemSubtitle,
-                    color = AppleTokens.Metadata,
+                    color = if (isBuffering) AppleTokens.AccentRed else AppleTokens.Metadata,
                     maxLines = 1
                 )
             }
@@ -581,14 +649,14 @@ fun DesktopMiniPlayerDock(
                 Icon(
                     imageVector = ConvxIcons.Shuffle,
                     contentDescription = "Shuffle",
-                    tint = AppleTokens.Metadata,
-                    modifier = Modifier.size(16.dp).clickable {}
+                    tint = if (isShuffle) AppleTokens.AccentRed else AppleTokens.Metadata,
+                    modifier = Modifier.size(16.dp).clickable(onClick = onToggleShuffle)
                 )
                 Icon(
                     imageVector = ConvxIcons.SkipBack,
                     contentDescription = "Previous",
                     tint = Color.White,
-                    modifier = Modifier.size(18.dp).clickable {}
+                    modifier = Modifier.size(18.dp).clickable(onClick = onPrevious)
                 )
                 // Play / Pause Circle Button
                 Box(
@@ -610,13 +678,13 @@ fun DesktopMiniPlayerDock(
                     imageVector = ConvxIcons.SkipForward,
                     contentDescription = "Next",
                     tint = Color.White,
-                    modifier = Modifier.size(18.dp).clickable {}
+                    modifier = Modifier.size(18.dp).clickable(onClick = onNext)
                 )
                 Icon(
                     imageVector = ConvxIcons.Repeat,
                     contentDescription = "Repeat",
-                    tint = AppleTokens.Metadata,
-                    modifier = Modifier.size(16.dp).clickable {}
+                    tint = if (repeatMode != RepeatMode.OFF) AppleTokens.AccentRed else AppleTokens.Metadata,
+                    modifier = Modifier.size(16.dp).clickable(onClick = onCycleRepeat)
                 )
             }
 
@@ -628,14 +696,14 @@ fun DesktopMiniPlayerDock(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "1:24",
+                    text = formatTime(positionMs),
                     fontSize = 11.sp,
                     color = AppleTokens.Metadata
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Slider(
                     value = progress,
-                    onValueChange = onProgressChange,
+                    onValueChange = onSeek,
                     modifier = Modifier.weight(1f).height(12.dp),
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
@@ -645,7 +713,7 @@ fun DesktopMiniPlayerDock(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "3:50",
+                    text = formatTime(durationMs),
                     fontSize = 11.sp,
                     color = AppleTokens.Metadata
                 )
