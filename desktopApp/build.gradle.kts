@@ -29,6 +29,13 @@ dependencies {
     implementation(project(":canvas"))
     implementation(project(":applecanvas"))
     implementation(project(":vivimusiccanvas"))
+    implementation(project(":lrclib"))
+    implementation(project(":betterlyrics"))
+    implementation(project(":kugou"))
+    implementation(project(":simpmusic"))
+    implementation(project(":youlyplus"))
+    implementation(project(":lastfm"))
+    implementation(project(":kizzy"))
 
     // Ktor and Coroutines
     implementation(libs.ktor.client.core)
