@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -54,6 +55,9 @@ import com.convx.desktop.audio.PlaybackStatus
 import com.convx.desktop.audio.RepeatMode
 import com.convx.desktop.db.ConvxDatabase
 import com.convx.desktop.db.SettingsManager
+import com.convx.desktop.integrations.DesktopDiscordRpc
+import com.convx.desktop.integrations.DesktopLastFm
+import com.convx.desktop.lyrics.DesktopLyricsManager
 import com.convx.desktop.ui.component.AsyncArtwork
 import com.convx.desktop.ui.component.GlassEffectConfig
 import com.convx.desktop.ui.component.LocalGlassEffectConfig
@@ -62,6 +66,7 @@ import com.convx.desktop.ui.component.liquidGlass
 import com.convx.desktop.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.desktop.ui.screens.HomeScreen
 import com.convx.desktop.ui.screens.LibraryScreen
+import com.convx.desktop.ui.screens.LyricsView
 import com.convx.desktop.ui.screens.SearchScreen
 import com.convx.desktop.ui.screens.SettingsScreen
 import com.convx.desktop.ui.screens.SongsScreen
@@ -102,6 +107,24 @@ fun WindowScope.DesktopShell(
         )
     }
     var selectedRoute by remember { mutableStateOf("home") }
+    var isLyricsOpen by remember { mutableStateOf(false) }
+
+    val lyricsManager = remember { DesktopLyricsManager.getInstance() }
+    val discordRpc = remember { DesktopDiscordRpc.getInstance() }
+    val lastFm = remember { DesktopLastFm.getInstance() }
+
+    val discordRpcEnabled by settingsManager.discordRpcEnabled.collectAsState(initial = false)
+    val discordToken by settingsManager.discordToken.collectAsState(initial = "")
+    val lastfmEnabled by settingsManager.lastfmEnabled.collectAsState(initial = false)
+    val lastfmSessionKey by settingsManager.lastfmSessionKey.collectAsState(initial = "")
+
+    LaunchedEffect(discordRpcEnabled, discordToken) {
+        discordRpc.updateConfig(discordRpcEnabled, discordToken)
+    }
+
+    LaunchedEffect(lastfmEnabled, lastfmSessionKey) {
+        lastFm.updateConfig(lastfmEnabled, lastfmSessionKey)
+    }
 
     // Reactive Player State
     val status = player?.status?.collectAsState()?.value ?: PlaybackStatus.IDLE
@@ -115,6 +138,41 @@ fun WindowScope.DesktopShell(
 
     val isPlaying = status == PlaybackStatus.PLAYING
     val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+
+    // When track changes, query lyrics and update now playing
+    LaunchedEffect(currentTrack?.id) {
+        val track = currentTrack
+        if (track != null) {
+            lyricsManager.loadLyrics(
+                trackId = track.id,
+                title = track.title,
+                artist = track.artists,
+                durationSeconds = track.durationSeconds
+            )
+            lastFm.updateNowPlaying(
+                title = track.title,
+                artist = track.artists,
+                durationSeconds = track.durationSeconds
+            )
+        } else {
+            lyricsManager.clear()
+            discordRpc.clearPresence()
+        }
+    }
+
+    // Reactive line positioning and rich presence updates
+    LaunchedEffect(positionMs, isPlaying) {
+        lyricsManager.updatePosition(positionMs)
+        if (currentTrack != null) {
+            discordRpc.updatePresence(
+                title = currentTrack.title,
+                artist = currentTrack.artists,
+                durationMs = durationMs,
+                positionMs = positionMs,
+                isPlaying = isPlaying
+            )
+        }
+    }
 
     val navItems = remember {
         listOf(
@@ -170,7 +228,10 @@ fun WindowScope.DesktopShell(
                         DesktopSidebar(
                             items = navItems,
                             selectedId = selectedRoute,
-                            onSelect = { selectedRoute = it },
+                            onSelect = { 
+                                selectedRoute = it
+                                isLyricsOpen = false
+                            },
                             glassConfig = glassConfig
                         )
 
@@ -183,6 +244,28 @@ fun WindowScope.DesktopShell(
                             glassConfig = glassConfig,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
+                    }
+
+                    // Floating Liquid Glass Lyrics Overlay (if open)
+                    if (isLyricsOpen) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = AppleTokens.Gutter)
+                                .padding(top = AppleTokens.Gutter, bottom = 100.dp)
+                        ) {
+                            LyricsView(
+                                lyricsManager = lyricsManager,
+                                thumbnailUrl = currentTrack?.thumbnailUrl,
+                                onSeekToTime = { timeMs ->
+                                    if (durationMs > 0) {
+                                        player?.seekTo((timeMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f))
+                                    }
+                                },
+                                onClose = { isLyricsOpen = false },
+                                glassConfig = glassConfig
+                            )
+                        }
                     }
 
                     // Floating Liquid Glass Mini Player Dock at bottom
@@ -229,6 +312,10 @@ fun WindowScope.DesktopShell(
                             repeatMode = repeatMode,
                             onCycleRepeat = {
                                 player?.cycleRepeat()
+                            },
+                            isLyricsOpen = isLyricsOpen,
+                            onToggleLyrics = {
+                                isLyricsOpen = !isLyricsOpen
                             },
                             glassConfig = glassConfig
                         )
@@ -499,6 +586,8 @@ fun DesktopMiniPlayerDock(
     onToggleShuffle: () -> Unit,
     repeatMode: RepeatMode,
     onCycleRepeat: () -> Unit,
+    isLyricsOpen: Boolean = false,
+    onToggleLyrics: () -> Unit = {},
     glassConfig: GlassEffectConfig,
     modifier: Modifier = Modifier
 ) {
@@ -628,12 +717,22 @@ fun DesktopMiniPlayerDock(
             }
         }
 
-        // Volume Controls
+        // Volume Controls + Lyrics Toggle
         Row(
-            modifier = Modifier.width(200.dp),
+            modifier = Modifier.width(240.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.End
         ) {
+            Icon(
+                imageVector = ConvxIcons.Lyrics,
+                contentDescription = "Lyrics",
+                tint = if (isLyricsOpen) AppleTokens.AccentRed else Color.White,
+                modifier = Modifier
+                    .size(18.dp)
+                    .clickable(onClick = onToggleLyrics)
+                    .pointerHoverIcon(PointerIcon.Hand)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
             Icon(
                 imageVector = if (isMuted) ConvxIcons.VolumeMute else ConvxIcons.VolumeUp,
                 contentDescription = "Mute",
@@ -644,7 +743,7 @@ fun DesktopMiniPlayerDock(
             Slider(
                 value = if (isMuted) 0f else volume,
                 onValueChange = onVolumeChange,
-                modifier = Modifier.width(110.dp).height(12.dp),
+                modifier = Modifier.width(100.dp).height(12.dp),
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
                     activeTrackColor = Color.White,

@@ -57,6 +57,8 @@ fun SettingsScreen(
     val glassStyle by settingsManager.glassStyle.collectAsState(initial = GlassStyle.LIQUID)
     val glassVibrancy by settingsManager.glassVibrancy.collectAsState(initial = 1.2f)
     val glassBlurRadius by settingsManager.glassBlurRadius.collectAsState(initial = 2f)
+    val discordRpcEnabled by settingsManager.discordRpcEnabled.collectAsState(initial = false)
+    val lastfmEnabled by settingsManager.lastfmEnabled.collectAsState(initial = false)
 
     Column(
         modifier = modifier
@@ -276,7 +278,80 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // SECTION 3: STORAGE & PERSISTENCE
+        // SECTION 3: INTEGRATIONS & SUBSYSTEMS
+        SettingsSectionHeader(title = "Integrations & Subsystems")
+
+        SettingsCard(glassConfig = glassConfig) {
+            // Discord Rich Presence Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(text = "Discord Rich Presence", fontSize = 14.sp, color = Color.White)
+                    Text(text = "Broadcast \"Listening to ...\" status via Kizzy RPC", fontSize = 12.sp, color = AppleTokens.Metadata)
+                }
+                Switch(
+                    checked = discordRpcEnabled,
+                    onCheckedChange = {
+                        scope.launch { settingsManager.setDiscordRpcEnabled(it) }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = AppleTokens.AccentRed
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Last.fm Scrobbler Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(text = "Last.fm Scrobbler", fontSize = 14.sp, color = Color.White)
+                    Text(text = "Track listening history and now playing status", fontSize = 12.sp, color = AppleTokens.Metadata)
+                }
+                Switch(
+                    checked = lastfmEnabled,
+                    onCheckedChange = {
+                        scope.launch { settingsManager.setLastfmEnabled(it) }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = AppleTokens.AccentRed
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Lyrics Subsystem Attribution
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(text = "Time-Synced Lyrics Providers", fontSize = 14.sp, color = Color.White)
+                    Text(text = "Multi-provider waterfall engine", fontSize = 12.sp, color = AppleTokens.Metadata)
+                }
+                Text(
+                    text = "LrcLib · Simp · YouLy · KuGou",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppleTokens.AccentRed
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // SECTION 4: STORAGE & PERSISTENCE
         SettingsSectionHeader(title = "Storage & Local Data")
 
         SettingsCard(glassConfig = glassConfig) {

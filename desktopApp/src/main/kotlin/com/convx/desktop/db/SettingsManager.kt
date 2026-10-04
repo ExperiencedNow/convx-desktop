@@ -38,6 +38,11 @@ class SettingsManager(
         private val KEY_GLASS_LENS_AMOUNT = floatPreferencesKey("glass_lens_amount")
         private val KEY_GLASS_STYLE = stringPreferencesKey("glass_style")
         private val KEY_PURE_BLACK = booleanPreferencesKey("pure_black")
+        private val KEY_DISCORD_RPC_ENABLED = booleanPreferencesKey("discord_rpc_enabled")
+        private val KEY_DISCORD_TOKEN = stringPreferencesKey("discord_token")
+        private val KEY_LASTFM_ENABLED = booleanPreferencesKey("lastfm_enabled")
+        private val KEY_LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
+        private val KEY_LASTFM_USERNAME = stringPreferencesKey("lastfm_username")
     }
 
     val volume: Flow<Float> = dataStore.data.map { it[KEY_VOLUME] ?: 0.75f }
@@ -62,6 +67,11 @@ class SettingsManager(
         }
     }
     val pureBlack: Flow<Boolean> = dataStore.data.map { it[KEY_PURE_BLACK] ?: false }
+    val discordRpcEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_DISCORD_RPC_ENABLED] ?: false }
+    val discordToken: Flow<String> = dataStore.data.map { it[KEY_DISCORD_TOKEN] ?: "" }
+    val lastfmEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_LASTFM_ENABLED] ?: false }
+    val lastfmSessionKey: Flow<String> = dataStore.data.map { it[KEY_LASTFM_SESSION_KEY] ?: "" }
+    val lastfmUsername: Flow<String> = dataStore.data.map { it[KEY_LASTFM_USERNAME] ?: "" }
 
     suspend fun setVolume(vol: Float) {
         dataStore.edit { it[KEY_VOLUME] = vol.coerceIn(0f, 1f) }
@@ -93,5 +103,24 @@ class SettingsManager(
 
     suspend fun setPureBlack(pureBlack: Boolean) {
         dataStore.edit { it[KEY_PURE_BLACK] = pureBlack }
+    }
+
+    suspend fun setDiscordRpcEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_DISCORD_RPC_ENABLED] = enabled }
+    }
+
+    suspend fun setDiscordToken(token: String) {
+        dataStore.edit { it[KEY_DISCORD_TOKEN] = token }
+    }
+
+    suspend fun setLastfmEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_LASTFM_ENABLED] = enabled }
+    }
+
+    suspend fun setLastfmSession(sessionKey: String, username: String) {
+        dataStore.edit {
+            it[KEY_LASTFM_SESSION_KEY] = sessionKey
+            it[KEY_LASTFM_USERNAME] = username
+        }
     }
 }

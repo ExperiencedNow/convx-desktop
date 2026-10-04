@@ -601,4 +601,38 @@ object ConvxIcons {
             }
         }.build()
     }
+
+    val Lyrics: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Lyrics",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(
+                fill = null,
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            ) {
+                // Speech bubble outline
+                moveTo(21f, 15f)
+                arcToRelative(2f, 2f, 0f, false, true, -2f, 2f)
+                horizontalLineTo(7f)
+                lineToRelative(-4f, 4f)
+                verticalLineTo(5f)
+                arcToRelative(2f, 2f, 0f, false, true, 2f, -2f)
+                horizontalLineToRelative(14f)
+                arcToRelative(2f, 2f, 0f, false, true, 2f, 2f)
+                close()
+                // Horizontal quote/lyrics lines inside
+                moveTo(8f, 9f)
+                horizontalLineToRelative(8f)
+                moveTo(8f, 13f)
+                horizontalLineToRelative(5f)
+            }
+        }.build()
+    }
 }
