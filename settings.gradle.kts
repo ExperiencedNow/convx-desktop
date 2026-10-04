@@ -36,6 +36,7 @@ include(":musixmatchlyrics")
 include(":jiosaavn")
 include(":spotify")
 include(":spine")
+include(":desktopApp")
 
 
 // Use a local copy of NewPipe Extractor by uncommenting the lines below.

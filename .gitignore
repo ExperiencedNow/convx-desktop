@@ -118,6 +118,8 @@ app/keystore/
 !SECURITY.md
 !.github/CONTRIBUTING.md
 !.github/pull_request_template.md
+!CONVX_DESKTOP_IMPLEMENTATION.md
+!docs/**
 app/src/main/kotlin/com/designRefrence/
 
 # Upstream marketing/store assets — not used by the build
