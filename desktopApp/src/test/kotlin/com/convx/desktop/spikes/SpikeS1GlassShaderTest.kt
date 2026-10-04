@@ -114,4 +114,17 @@ class SpikeS1GlassShaderTest {
         println("SUCCESS: Uniform buffer (44 bytes) bound and Skia Shader evaluated successfully!")
         assertTrue("Shader instance is active", !appliedShader.isClosed)
     }
+
+    @Test
+    fun testSkiaImageFilter() {
+        println("=== SPIKE S1: TESTING SKIA IMAGE FILTER AND PAINT ===")
+        val blurFilter = org.jetbrains.skia.ImageFilter.makeBlur(10f, 10f, org.jetbrains.skia.FilterTileMode.CLAMP)
+        assertNotNull("Blur filter should be created", blurFilter)
+
+        val paint = org.jetbrains.skia.Paint().apply {
+            imageFilter = blurFilter
+        }
+        assertNotNull("Paint should accept blurFilter", paint.imageFilter)
+        println("SUCCESS: Skia ImageFilter blur created and applied to Paint!")
+    }
 }
